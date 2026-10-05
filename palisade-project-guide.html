@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palisade — Syscall Sandbox · BCSE303P Project Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#EDEEE9;
+  --panel:#F8F9F6;
+  --ink:#161A18;
+  --muted:#5F6B64;
+  --faint:#8A948E;
+  --rule:#D2D7CF;
+  --allow:#1F6F5C;
+  --errno:#A9640C;
+  --kill:#9C2B25;
+  --code-bg:#141917;
+  --code-fg:#DCE3DE;
+  --code-dim:#7E8C85;
+  --sans:"Public Sans",system-ui,sans-serif;
+  --disp:"Archivo",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:1.5rem}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1px solid var(--rule);padding:38px 0 30px}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 14px
+}
+.wordmark{
+  font-family:var(--disp);font-weight:800;font-size:clamp(46px,9vw,86px);
+  letter-spacing:-.035em;line-height:.92;margin:0
+}
+.wordmark span{color:var(--allow)}
+.tagline{
+  font-size:clamp(17px,2.4vw,21px);color:var(--muted);margin:16px 0 0;max-width:44ch;
+}
+.meta{
+  display:flex;flex-wrap:wrap;gap:8px;margin-top:26px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.02em
+}
+.meta i{
+  font-style:normal;border:1px solid var(--rule);background:var(--panel);
+  padding:5px 10px;border-radius:3px;color:var(--muted)
+}
+.meta i b{color:var(--ink);font-weight:600}
+
+/* ---------- signature: verdict strip ---------- */
+.strip{margin:34px 0 0;border:1px solid var(--rule);background:var(--panel);border-radius:4px;overflow:hidden}
+.strip-head{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:11px 16px;border-bottom:1px solid var(--rule);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)
+}
+.strip-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr))}
+.vrow{
+  display:flex;align-items:center;gap:12px;padding:11px 16px;
+  border-bottom:1px solid var(--rule);border-right:1px solid var(--rule);
+  font-family:var(--mono);font-size:13px;
+  opacity:0;animation:settle .42s ease-out forwards
+}
+.vrow:nth-child(1){animation-delay:.05s}.vrow:nth-child(2){animation-delay:.13s}
+.vrow:nth-child(3){animation-delay:.21s}.vrow:nth-child(4){animation-delay:.29s}
+.vrow:nth-child(5){animation-delay:.37s}.vrow:nth-child(6){animation-delay:.45s}
+.vrow:nth-child(7){animation-delay:.53s}.vrow:nth-child(8){animation-delay:.61s}
+@keyframes settle{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.vrow .sc{flex:1;font-weight:500}
+.vrow .note{color:var(--faint);font-size:11.5px}
+.chip{
+  font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  padding:3px 8px;border-radius:2px;white-space:nowrap;color:#fff
+}
+.chip.a{background:var(--allow)}
+.chip.e{background:var(--errno)}
+.chip.k{background:var(--kill)}
+
+/* ---------- layout ---------- */
+.cols{display:grid;grid-template-columns:216px 1fr;gap:56px;padding:44px 0 90px;align-items:start}
+nav.toc{position:sticky;top:22px}
+nav.toc h4{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 12px;font-weight:600
+}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:t}
+nav.toc li{counter-increment:t;margin:0}
+nav.toc a{
+  display:flex;gap:9px;padding:4px 0;text-decoration:none;color:var(--muted);
+  font-size:13.5px;line-height:1.35;border-left:2px solid transparent;padding-left:10px;margin-left:-12px
+}
+nav.toc a::before{
+  content:counter(t,decimal-leading-zero);font-family:var(--mono);font-size:10.5px;
+  color:var(--faint);padding-top:2px
+}
+nav.toc a:hover{color:var(--ink)}
+nav.toc a.on{color:var(--allow);border-left-color:var(--allow);font-weight:600}
+main{min-width:0;max-width:790px}
+
+/* ---------- typography ---------- */
+section{margin:0 0 58px;scroll-margin-top:22px}
+h2{
+  font-family:var(--disp);font-weight:700;font-size:clamp(25px,3.6vw,33px);
+  letter-spacing:-.022em;line-height:1.14;margin:0 0 6px
+}
+.sec-eyebrow{
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--allow);margin:0 0 9px
+}
+h3{
+  font-family:var(--disp);font-weight:700;font-size:18.5px;letter-spacing:-.012em;
+  margin:34px 0 8px
+}
+h4{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.04em;margin:24px 0 7px;color:var(--muted);text-transform:uppercase}
+p{margin:0 0 14px}
+.lede{font-size:17.5px;color:var(--muted);margin-bottom:22px}
+ul,ol.body{padding-left:19px;margin:0 0 15px}
+li{margin-bottom:6px}
+a{color:var(--allow)}
+code{
+  font-family:var(--mono);font-size:.875em;background:#E2E5DE;
+  padding:1.5px 4.5px;border-radius:2.5px;color:#0F3B31
+}
+strong{font-weight:600}
+hr.div{border:0;border-top:1px solid var(--rule);margin:34px 0}
+
+/* ---------- code blocks ---------- */
+.code{
+  background:var(--code-bg);color:var(--code-fg);border-radius:4px;
+  margin:0 0 16px;overflow:hidden
+}
+.code .lbl{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--code-dim);padding:9px 15px;border-bottom:1px solid #262E2B
+}
+.code pre{
+  margin:0;padding:14px 15px;overflow-x:auto;
+  font-family:var(--mono);font-size:12.6px;line-height:1.68
+}
+.code pre .c{color:#6F827A}
+.code pre .k{color:#7FC4A8}
+.code pre .s{color:#D6B072}
+.code pre .p{color:#E08E7F}
+
+/* ---------- tables ---------- */
+.tbl{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14.2px;display:table}
+.tbl th{
+  text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);font-weight:600;
+  padding:8px 12px 8px 0;border-bottom:1px solid var(--ink)
+}
+.tbl td{padding:10px 12px 10px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl td:first-child{font-family:var(--mono);font-size:12.8px;white-space:nowrap;padding-right:20px}
+.tbl.wide td:first-child{white-space:normal}
+
+/* ---------- callouts ---------- */
+.note{
+  border-left:3px solid var(--allow);background:var(--panel);
+  padding:14px 16px;margin:0 0 18px;border-radius:0 3px 3px 0
+}
+.note.warn{border-left-color:var(--errno)}
+.note.stop{border-left-color:var(--kill)}
+.note p:last-child{margin-bottom:0}
+.note .tag{
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--allow);display:block;margin-bottom:5px
+}
+.note.warn .tag{color:var(--errno)}
+.note.stop .tag{color:var(--kill)}
+
+/* ---------- layer cards ---------- */
+.layers{display:grid;gap:12px;margin:0 0 18px}
+.layer{
+  border:1px solid var(--rule);background:var(--panel);border-radius:4px;padding:15px 17px;
+  display:grid;grid-template-columns:auto 1fr;gap:15px;align-items:start
+}
+.layer .num{
+  font-family:var(--mono);font-size:11px;font-weight:600;color:#fff;background:var(--ink);
+  width:23px;height:23px;display:grid;place-items:center;border-radius:3px;margin-top:2px
+}
+.layer h5{font-family:var(--mono);font-size:13.5px;margin:0 0 5px;font-weight:600}
+.layer p{margin:0;font-size:14.2px;color:var(--muted)}
+
+/* ---------- week plan ---------- */
+.weeks{border-top:1px solid var(--ink)}
+.wk{
+  display:grid;grid-template-columns:76px 1fr 60px;gap:16px;
+  padding:13px 0;border-bottom:1px solid var(--rule);align-items:baseline
+}
+.wk .n{font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.05em}
+.wk .h{font-family:var(--mono);font-size:11.5px;color:var(--faint);text-align:right}
+.wk b{display:block;font-weight:600;font-size:14.8px;margin-bottom:2px}
+.wk span.d{font-size:13.8px;color:var(--muted);line-height:1.5}
+
+footer{border-top:1px solid var(--rule);padding:26px 0 60px;color:var(--faint);font-size:13px;font-family:var(--mono)}
+
+@media (max-width:980px){
+  .cols{grid-template-columns:1fr;gap:0;padding-top:28px}
+  nav.toc{position:static;border:1px solid var(--rule);background:var(--panel);
+    border-radius:4px;padding:16px 18px;margin-bottom:34px}
+  nav.toc ol{columns:2;column-gap:22px}
+  main{max-width:none}
+}
+@media (max-width:600px){
+  .wrap{padding:0 18px}
+  nav.toc ol{columns:1}
+  .wk{grid-template-columns:1fr;gap:3px}
+  .wk .h{text-align:left}
+  .tbl td:first-child{white-space:normal}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .vrow{opacity:1}
+  html{scroll-behavior:auto}
+}
+@media print{
+  body{background:#fff}
+  nav.toc{display:none}
+  .cols{grid-template-columns:1fr;padding:0}
+  .code{border:1px solid #999}
+  section{page-break-inside:avoid}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <p class="eyebrow">BCSE303P · Operating Systems Lab · Course Project</p>
+    <h1 class="wordmark">Pali<span>sade</span></h1>
+    <p class="tagline">Run untrusted code against a written permission list. Everything not on the list is refused by the kernel.</p>
+    <div class="meta">
+      <i><b>30</b> lab hours</i>
+      <i><b>C</b> + Python</i>
+      <i>no root required</i>
+      <i>no kernel modules</i>
+      <i>Linux <b>&ge; 5.13</b></i>
+    </div>
+
+    <div class="strip">
+      <div class="strip-head">
+        <span>Compiled filter · policy/strict.toml</span>
+        <span>seccomp_export_pfc()</span>
+      </div>
+      <div class="strip-rows">
+        <div class="vrow"><span class="sc">write</span><span class="note">fd 1,2</span><span class="chip a">allow</span></div>
+        <div class="vrow"><span class="sc">openat</span><span class="note">beneath /work</span><span class="chip a">allow</span></div>
+        <div class="vrow"><span class="sc">read</span><span class="chip a">allow</span></div>
+        <div class="vrow"><span class="sc">socket</span><span class="note">EPERM</span><span class="chip e">errno</span></div>
+        <div class="vrow"><span class="sc">ptrace</span><span class="note">EPERM</span><span class="chip e">errno</span></div>
+        <div class="vrow"><span class="sc">unlinkat</span><span class="note">EPERM</span><span class="chip e">errno</span></div>
+        <div class="vrow"><span class="sc">mount</span><span class="note">SIGSYS</span><span class="chip k">kill</span></div>
+        <div class="vrow"><span class="sc">init_module</span><span class="note">SIGSYS</span><span class="chip k">kill</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="cols">
+
+<nav class="toc" id="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#what">What you are building</a></li>
+    <li><a href="#syllabus">Syllabus mapping</a></li>
+    <li><a href="#hardware">Hardware</a></li>
+    <li><a href="#software">Software</a></li>
+    <li><a href="#verify">Verify the environment</a></li>
+    <li><a href="#layout">Project layout</a></li>
+    <li><a href="#first">First filter</a></li>
+    <li><a href="#policy">Policy format</a></li>
+    <li><a href="#loader">Policy loader</a></li>
+    <li><a href="#landlock">Landlock layer</a></li>
+    <li><a href="#launcher">The launcher</a></li>
+    <li><a href="#plan">Session plan</a></li>
+    <li><a href="#bench">Benchmarks</a></li>
+    <li><a href="#tests">Test suite</a></li>
+    <li><a href="#demo">Demo script</a></li>
+    <li><a href="#report">Report structure</a></li>
+    <li><a href="#trouble">Troubleshooting</a></li>
+    <li><a href="#refs">References</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="what">
+  <p class="sec-eyebrow">Section 01</p>
+  <h2>What you are building</h2>
+  <p class="lede">A command-line launcher that starts a program with a restricted view of the kernel. You hand it a policy file and a command; it applies three independent restrictions and then executes.</p>
+
+  <div class="code">
+    <div class="lbl">usage</div>
+<pre><span class="p">$</span> palisade run --policy policy/strict.toml -- python3 untrusted.py
+<span class="c"># untrusted.py can read and write under /work, print to stdout,
+# and nothing else. socket() returns EPERM. mount() kills it.</span></pre>
+  </div>
+
+  <p>The three restrictions stack, and each one covers a gap the others leave open.</p>
+
+  <div class="layers">
+    <div class="layer">
+      <div class="num">1</div>
+      <div>
+        <h5>PR_SET_NO_NEW_PRIVS</h5>
+        <p>A one-line <code>prctl()</code> that permanently blocks privilege gain through <code>execve</code>. Setuid binaries stop being setuid for this process and all its descendants. It is also the precondition that lets an unprivileged process install a seccomp filter at all.</p>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="num">2</div>
+      <div>
+        <h5>seccomp-bpf</h5>
+        <p>A BPF program attached to the process, consulted by the kernel on every syscall entry. It decides by syscall number and by scalar argument values. Verdicts: allow, return an errno, or kill. Fast — a few dozen nanoseconds — because it runs in kernel context with no context switch.</p>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="num">3</div>
+      <div>
+        <h5>Landlock LSM</h5>
+        <p>Filesystem access control by path, unprivileged and stackable. This exists because of the single most important constraint in the project, below.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <span class="tag">The central constraint</span>
+    <p><strong>A seccomp filter cannot dereference pointers.</strong> The BPF program sees the syscall number and the six raw register arguments. When those arguments are addresses — the path in <code>openat</code>, the sockaddr in <code>connect</code> — the filter sees a number, not a string. It cannot read userspace memory, because doing so safely would mean handling page faults inside the filter, and because another thread could rewrite that memory between the check and the syscall (a TOCTOU race).</p>
+    <p>This is why "block <code>openat</code> on <code>/etc/passwd</code>" is impossible in seccomp alone, and it is why Landlock exists. Understanding this trade-off is the intellectual core of the project — put it in the report.</p>
+  </div>
+
+  <h3>What is deliberately out of scope</h3>
+  <p>Linux offers a fourth mechanism, <code>SECCOMP_RET_USER_NOTIF</code>, which parks the syscall and asks a supervisor process for a verdict. The supervisor can read the target's memory and inspect real paths. It is the general solution, and it costs roughly a hundred times more per call because every check becomes a context-switch round trip.</p>
+  <p>At 30 lab hours it does not fit, and Landlock covers the filesystem case in-kernel for free. Do not build it. <em>Do</em> write a paragraph in the report explaining that you considered it and rejected it on cost grounds — a rejected design with a stated reason is stronger evidence of understanding than a half-finished feature.</p>
+</section>
+
+<section id="syllabus">
+  <p class="sec-eyebrow">Section 02</p>
+  <h2>Syllabus mapping</h2>
+  <p>Reproduce this table on the first page of your report. Graders mark against course outcomes, and this does that job for them.</p>
+
+  <table class="tbl wide">
+    <tr><th>Outcome</th><th>Coverage</th></tr>
+    <tr><td><strong>CO1</strong><br>system calls, process states</td><td>Direct. The whole project is syscall interception: <code>prctl</code>, <code>seccomp</code>, <code>execve</code>, <code>fork</code>, filter inheritance across process creation, and the <code>SIGSYS</code> death of a violating process.</td></tr>
+    <tr><td><strong>CO5</strong><br>protection and security</td><td>Direct. Least-privilege enforcement, mandatory access control via an LSM, defence in depth across three layers, and adversarial testing of your own mechanism.</td></tr>
+    <tr><td><strong>CO2</strong><br>trade-off analysis</td><td>Partial but real. Your benchmark quantifies the cost of each enforcement layer, and the user-notification analysis is an explicit design trade-off with numbers behind it.</td></tr>
+    <tr><td><strong>CO3</strong><br>synchronization</td><td>Partial. Filter installation across a multithreaded process requires <code>SECCOMP_FILTER_FLAG_TSYNC</code>; without it, only the calling thread is filtered and the sandbox is trivially escapable. That is a synchronization problem with a security consequence.</td></tr>
+  </table>
+
+  <p>Two indicative experiments feed this project directly. Experiment 4 (<code>fork</code>, orphan and zombie processes) is the mechanism your launcher uses, and experiment 8 (Pthreads) is where the TSYNC issue becomes concrete.</p>
+</section>
+
+<section id="hardware">
+  <p class="sec-eyebrow">Section 03</p>
+  <h2>Hardware</h2>
+  <p>Nothing specialized. No nested virtualization, no bare-metal Linux install, no lab machine reconfiguration.</p>
+
+  <table class="tbl wide">
+    <tr><th>Item</th><th>Requirement</th></tr>
+    <tr><td>Development host</td><td>Your MacBook Air. Everything runs inside a Linux VM.</td></tr>
+    <tr><td>VM allocation</td><td>Minimum 2 vCPU / 4 GB RAM / 20 GB disk. Comfortable: 4 vCPU / 8 GB.</td></tr>
+    <tr><td>Demo machine</td><td>Any x86_64 lab PC with kernel 5.13 or newer. Ubuntu 22.04 and later both qualify.</td></tr>
+    <tr><td>Privileges needed</td><td>None. seccomp and Landlock are unprivileged interfaces by design.</td></tr>
+  </table>
+
+  <div class="note stop">
+    <span class="tag">Architecture mismatch — plan for it in week 1</span>
+    <p>Your VM is <code>aarch64</code>. The lab machine is <code>x86_64</code>. <strong>Syscall numbers differ between them</strong> — <code>openat</code> is 56 on ARM64 and 257 on x86_64. Hardcode a number and your sandbox will silently permit the wrong syscall when you move it, which is the worst possible failure for a security tool.</p>
+    <p>Two defences, both cheap. First, always name syscalls with <code>SCMP_SYS(openat)</code> and let libseccomp resolve them per-architecture. Second, add a GitHub Actions workflow running your tests on <code>ubuntu-latest</code>, which is x86_64 and free — you get continuous proof it works on demo hardware without borrowing a lab PC.</p>
+  </div>
+</section>
+
+<section id="software">
+  <p class="sec-eyebrow">Section 04</p>
+  <h2>Software</h2>
+
+  <h3>Guest OS: Ubuntu 24.04 LTS</h3>
+  <p>Kernel 6.8, which gives you Landlock ABI 4 and every seccomp feature you need. <strong>Do not use 22.04.</strong> Its 5.15 kernel compiles Landlock in but leaves it out of the default LSM list, and you would lose a lab session discovering that.</p>
+
+  <h3>VM manager</h3>
+  <p><strong>OrbStack</strong> is the least friction on Apple Silicon — Linux machines boot in about two seconds and share the filesystem with macOS. Lima and UTM both work fine too.</p>
+
+  <div class="note warn">
+    <span class="tag">Avoid</span>
+    <p>Do not develop inside a Docker container. Docker applies its own seccomp profile to every container, so you would be testing your filter through someone else's filter. Use a real VM.</p>
+  </div>
+
+  <h3>Packages</h3>
+  <div class="code">
+    <div class="lbl">one-time setup</div>
+<pre>sudo apt update
+sudo apt install -y build-essential libseccomp-dev seccomp \
+  linux-libc-dev pkg-config gdb strace linux-tools-generic \
+  python3 python3-pip bats git</pre>
+  </div>
+
+  <table class="tbl wide">
+    <tr><th>Package</th><th>Why</th></tr>
+    <tr><td>libseccomp-dev</td><td>The filter-building API. Use it rather than hand-writing BPF — it handles multiplexed syscalls and per-architecture numbering for you.</td></tr>
+    <tr><td>seccomp</td><td>Ships <code>scmp_sys_resolver</code>, which maps syscall names to numbers per architecture. Useful in the report.</td></tr>
+    <tr><td>linux-libc-dev</td><td>Provides <code>&lt;linux/landlock.h&gt;</code>. There is no <code>liblandlock</code>; you invoke the three syscalls directly.</td></tr>
+    <tr><td>linux-tools-generic</td><td><code>perf</code>, for the benchmark section.</td></tr>
+    <tr><td>strace</td><td>Your primary debugging tool. When something is blocked and you do not know why, strace shows you the exact call and the exact errno.</td></tr>
+    <tr><td>bats</td><td>Shell test harness. Substitute pytest if you prefer Python.</td></tr>
+  </table>
+</section>
+
+<section id="verify">
+  <p class="sec-eyebrow">Section 05</p>
+  <h2>Verify the environment</h2>
+  <p>Run this before writing any code. Thirty seconds now, or a lost lab session later.</p>
+
+  <div class="code">
+    <div class="lbl">checks</div>
+<pre><span class="p">$</span> uname -m -r
+aarch64 6.8.0-generic          <span class="c"># need >= 5.13; note the arch</span>
+
+<span class="p">$</span> grep CONFIG_SECCOMP_FILTER /boot/config-$(uname -r)
+CONFIG_SECCOMP_FILTER=y
+
+<span class="p">$</span> cat /sys/kernel/security/lsm
+lockdown,capability,landlock,yama,apparmor,bpf   <span class="c"># must list landlock</span>
+
+<span class="p">$</span> scmp_sys_resolver openat
+56                             <span class="c"># 257 on an x86_64 lab machine</span></pre>
+  </div>
+
+  <p>If <code>landlock</code> is missing from the LSM list, enable it and reboot:</p>
+
+  <div class="code">
+    <div class="lbl">enabling landlock</div>
+<pre><span class="c"># edit /etc/default/grub, append to GRUB_CMDLINE_LINUX_DEFAULT:</span>
+lsm=landlock,lockdown,yama,apparmor,bpf
+
+<span class="p">$</span> sudo update-grub &amp;&amp; sudo reboot</pre>
+  </div>
+</section>
+
+<section id="layout">
+  <p class="sec-eyebrow">Section 06</p>
+  <h2>Project layout</h2>
+
+  <div class="code">
+    <div class="lbl">tree</div>
+<pre>palisade/
+├── Makefile
+├── src/
+│   ├── main.c          <span class="c"># argument parsing, fork/exec</span>
+│   ├── policy.c/.h     <span class="c"># policy file → libseccomp context</span>
+│   ├── landlock.c/.h   <span class="c"># path rules, ABI negotiation</span>
+│   └── util.c/.h       <span class="c"># errors, logging</span>
+├── policy/
+│   ├── minimal.toml    <span class="c"># static binary, stdout only</span>
+│   ├── script.toml     <span class="c"># python3 under /work</span>
+│   └── strict.toml     <span class="c"># demo policy</span>
+├── tests/
+│   ├── functional.bats
+│   └── adversarial/    <span class="c"># escape attempts, one C file each</span>
+├── bench/
+│   ├── syscall_loop.c
+│   └── plot.py
+└── report/
+    └── figures/</pre>
+  </div>
+
+  <div class="code">
+    <div class="lbl">Makefile</div>
+<pre>CC      = gcc
+CFLAGS  = -Wall -Wextra -O2 -std=c11 -D_GNU_SOURCE
+LDLIBS  = -lseccomp
+SRC     = $(wildcard src/*.c)
+OBJ     = $(SRC:.c=.o)
+
+palisade: $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
+
+bench: bench/syscall_loop.c
+	$(CC) $(CFLAGS) -o bench/syscall_loop $&lt; $(LDLIBS)
+
+test: palisade
+	bats tests/functional.bats
+
+clean:
+	rm -f palisade $(OBJ) bench/syscall_loop
+
+.PHONY: bench test clean</pre>
+  </div>
+</section>
+
+<section id="first">
+  <p class="sec-eyebrow">Section 07</p>
+  <h2>First filter</h2>
+  <p>Get this running in your first session. It proves the toolchain works and gives you the <code>SIGSYS</code> behaviour to reason about.</p>
+
+  <div class="code">
+    <div class="lbl">src/hello_filtered.c</div>
+<pre><span class="k">#include</span> <span class="s">&lt;seccomp.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;stdio.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;stdlib.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;unistd.h&gt;</span>
+
+<span class="k">int</span> main(<span class="k">void</span>) {
+    <span class="c">/* Default action for anything not explicitly allowed. */</span>
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL_PROCESS);
+    <span class="k">if</span> (!ctx) { perror(<span class="s">"seccomp_init"</span>); <span class="k">return</span> 1; }
+
+    <span class="c">/* Allow write only to stdout and stderr — argument filtering
+       works here because fd is a scalar, not a pointer. */</span>
+    seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 1,
+                     SCMP_A0(SCMP_CMP_EQ, 1));
+    seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 1,
+                     SCMP_A0(SCMP_CMP_EQ, 2));
+
+    <span class="c">/* Needed for a clean exit and for glibc's own teardown. */</span>
+    seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
+    seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit), 0);
+
+    <span class="c">/* Dump the compiled filter as readable pseudocode — this is
+       your debugger and a figure for the report. */</span>
+    seccomp_export_pfc(ctx, STDERR_FILENO);
+
+    <span class="c">/* libseccomp sets PR_SET_NO_NEW_PRIVS for you here. */</span>
+    <span class="k">if</span> (seccomp_load(ctx) &lt; 0) { perror(<span class="s">"seccomp_load"</span>); <span class="k">return</span> 1; }
+    seccomp_release(ctx);
+
+    write(1, <span class="s">"allowed: write to stdout\n"</span>, 25);
+
+    <span class="c">/* Not in the allowlist. The kernel kills us here. */</span>
+    getpid();
+
+    write(1, <span class="s">"never reached\n"</span>, 14);
+    <span class="k">return</span> 0;
+}</pre>
+  </div>
+
+  <div class="code">
+    <div class="lbl">expected behaviour</div>
+<pre><span class="p">$</span> gcc -Wall -O2 -o hello hello_filtered.c -lseccomp
+<span class="p">$</span> ./hello 2&gt;/dev/null
+allowed: write to stdout
+Bad system call (core dumped)
+
+<span class="p">$</span> echo $?
+159                            <span class="c"># 128 + 31, where 31 is SIGSYS</span></pre>
+  </div>
+
+  <div class="note">
+    <span class="tag">Three things to notice</span>
+    <p><strong>libseccomp sets no_new_privs automatically.</strong> The <code>SCMP_FLTATR_CTL_NNP</code> attribute defaults to on. You can turn it off, but you never should — without it an unprivileged <code>seccomp_load</code> fails outright.</p>
+    <p><strong>Exit code 159 is your signature for a kill verdict.</strong> Your test suite will assert on it.</p>
+    <p><strong><code>seccomp_export_pfc()</code> is the single most useful debugging call in this project.</strong> It prints the compiled filter as readable pseudocode, turning "why was that blocked" from an hour of guessing into ten seconds of reading. Wire it behind a <code>--dump-filter</code> flag on day one.</p>
+  </div>
+
+  <p>Now try the same program with <code>SCMP_ACT_ERRNO(EPERM)</code> as the default instead of <code>SCMP_ACT_KILL_PROCESS</code>, and watch it limp along instead of dying. That contrast — fail-closed versus fail-soft — is a real policy design question and belongs in the report.</p>
+</section>
+
+<section id="policy">
+  <p class="sec-eyebrow">Section 08</p>
+  <h2>Policy format</h2>
+  <p>A policy is a text file, not a recompile. This is what makes the tool usable and what makes your demo interesting.</p>
+
+  <div class="code">
+    <div class="lbl">policy/script.toml</div>
+<pre><span class="c"># Run a Python script with filesystem access limited to /work.</span>
+
+[meta]
+name        = <span class="s">"python-script"</span>
+description = <span class="s">"CPython with read/write under /work, no network"</span>
+
+[seccomp]
+<span class="c"># Anything not matched below.</span>
+default = <span class="s">"kill"</span>          <span class="c"># kill | errno:EPERM | log</span>
+
+allow = [
+  <span class="s">"read"</span>, <span class="s">"write"</span>, <span class="s">"openat"</span>, <span class="s">"close"</span>, <span class="s">"fstat"</span>, <span class="s">"newfstatat"</span>,
+  <span class="s">"lseek"</span>, <span class="s">"mmap"</span>, <span class="s">"munmap"</span>, <span class="s">"mprotect"</span>, <span class="s">"brk"</span>,
+  <span class="s">"rt_sigaction"</span>, <span class="s">"rt_sigprocmask"</span>, <span class="s">"getrandom"</span>,
+  <span class="s">"exit"</span>, <span class="s">"exit_group"</span>, <span class="s">"futex"</span>, <span class="s">"getdents64"</span>,
+]
+
+<span class="c"># Refused politely — the program sees an error and may recover.</span>
+errno = [
+  { syscall = <span class="s">"socket"</span>,  code = <span class="s">"EPERM"</span> },
+  { syscall = <span class="s">"connect"</span>, code = <span class="s">"EPERM"</span> },
+  { syscall = <span class="s">"ptrace"</span>,  code = <span class="s">"EPERM"</span> },
+]
+
+[landlock]
+read_write = [<span class="s">"/work"</span>]
+read_only  = [<span class="s">"/usr"</span>, <span class="s">"/lib"</span>, <span class="s">"/etc/ld.so.cache"</span>]
+execute    = [<span class="s">"/usr/bin/python3"</span>]</pre>
+  </div>
+
+  <h3>How to discover the syscall set for a program</h3>
+  <p>Do not guess. Trace it, then narrow.</p>
+
+  <div class="code">
+    <div class="lbl">building an allowlist empirically</div>
+<pre><span class="p">$</span> strace -f -c -o trace.txt python3 hello.py
+<span class="p">$</span> awk 'NR&gt;3 {print $NF}' trace.txt | sort -u</pre>
+  </div>
+
+  <p>This produces a working set, not a minimal one. Trim it by removing entries and re-running until something breaks — the syscalls whose removal breaks the program are the true minimum. Document that iteration in the report; it demonstrates the tension between security and usability better than any prose could.</p>
+
+  <div class="note warn">
+    <span class="tag">Expect surprises</span>
+    <p>A trivial Python script needs on the order of 60 distinct syscalls, most of them from the dynamic loader before your code runs at all. A statically linked C program needs about six. That gap is a finding worth a paragraph.</p>
+  </div>
+</section>
+
+<section id="loader">
+  <p class="sec-eyebrow">Section 09</p>
+  <h2>Policy loader</h2>
+  <p>Keep C for enforcement and put parsing in Python. A Python script reads the TOML and emits a small generated C header or a simple binary spec; the C launcher consumes it. This avoids linking a TOML library into your security-critical code and keeps the C side auditable.</p>
+
+  <div class="code">
+    <div class="lbl">src/policy.c — the essential loop</div>
+<pre><span class="k">int</span> policy_apply(<span class="k">const</span> policy_t *p) {
+    uint32_t def = p-&gt;kill_default
+        ? SCMP_ACT_KILL_PROCESS
+        : SCMP_ACT_ERRNO(EPERM);
+
+    scmp_filter_ctx ctx = seccomp_init(def);
+    <span class="k">if</span> (!ctx) <span class="k">return</span> -1;
+
+    <span class="c">/* Filter every thread, not just this one. Without TSYNC a
+       multithreaded target escapes trivially: one thread installs
+       the filter, the others run unrestricted. */</span>
+    <span class="k">if</span> (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_TSYNC, 1) &lt; 0)
+        <span class="k">goto</span> fail;
+
+    <span class="k">for</span> (size_t i = 0; i &lt; p-&gt;n_allow; i++) {
+        <span class="k">int</span> nr = seccomp_syscall_resolve_name(p-&gt;allow[i]);
+        <span class="k">if</span> (nr == __NR_SCMP_ERROR) {
+            <span class="c">/* Unknown on THIS architecture — warn, do not fail.
+               Some syscalls exist on x86_64 but not arm64. */</span>
+            warn_unknown(p-&gt;allow[i]);
+            <span class="k">continue</span>;
+        }
+        <span class="k">if</span> (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, nr, 0) &lt; 0)
+            <span class="k">goto</span> fail;
+    }
+
+    <span class="k">for</span> (size_t i = 0; i &lt; p-&gt;n_errno; i++) {
+        <span class="k">int</span> nr = seccomp_syscall_resolve_name(p-&gt;errno_rules[i].name);
+        <span class="k">if</span> (nr == __NR_SCMP_ERROR) <span class="k">continue</span>;
+        <span class="k">if</span> (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(p-&gt;errno_rules[i].code),
+                             nr, 0) &lt; 0)
+            <span class="k">goto</span> fail;
+    }
+
+    <span class="k">if</span> (p-&gt;dump) seccomp_export_pfc(ctx, STDERR_FILENO);
+
+    <span class="k">int</span> rc = seccomp_load(ctx);
+    seccomp_release(ctx);
+    <span class="k">return</span> rc;
+
+fail:
+    seccomp_release(ctx);
+    <span class="k">return</span> -1;
+}</pre>
+  </div>
+
+  <div class="note">
+    <span class="tag">Report material</span>
+    <p>The TSYNC flag is your CO3 hook. Write a two-thread demo where the filter is installed without TSYNC and the second thread happily calls a forbidden syscall. Then enable TSYNC and show it blocked. That is a synchronization bug with a security consequence, demonstrated in about forty lines.</p>
+  </div>
+</section>
+
+<section id="landlock">
+  <p class="sec-eyebrow">Section 10</p>
+  <h2>Landlock layer</h2>
+  <p>There is no library. You call three syscalls through <code>syscall()</code>, and you must negotiate the ABI version because access rights added in later kernels cause <code>EINVAL</code> on older ones.</p>
+
+  <div class="code">
+    <div class="lbl">src/landlock.c</div>
+<pre><span class="k">#include</span> <span class="s">&lt;linux/landlock.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;sys/syscall.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;sys/prctl.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;fcntl.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;unistd.h&gt;</span>
+
+<span class="k">static inline int</span> ll_create(<span class="k">const struct</span> landlock_ruleset_attr *a,
+                             size_t sz, uint32_t flags) {
+    <span class="k">return</span> syscall(__NR_landlock_create_ruleset, a, sz, flags);
+}
+<span class="k">static inline int</span> ll_add(<span class="k">int</span> fd, <span class="k">enum</span> landlock_rule_type t,
+                          <span class="k">const void</span> *attr, uint32_t flags) {
+    <span class="k">return</span> syscall(__NR_landlock_add_rule, fd, t, attr, flags);
+}
+<span class="k">static inline int</span> ll_restrict(<span class="k">int</span> fd, uint32_t flags) {
+    <span class="k">return</span> syscall(__NR_landlock_restrict_self, fd, flags);
+}
+
+<span class="k">#define</span> FS_READ  (LANDLOCK_ACCESS_FS_READ_FILE | \
+                    LANDLOCK_ACCESS_FS_READ_DIR)
+<span class="k">#define</span> FS_WRITE (LANDLOCK_ACCESS_FS_WRITE_FILE | \
+                    LANDLOCK_ACCESS_FS_MAKE_REG | \
+                    LANDLOCK_ACCESS_FS_MAKE_DIR | \
+                    LANDLOCK_ACCESS_FS_REMOVE_FILE | \
+                    LANDLOCK_ACCESS_FS_REMOVE_DIR)
+
+<span class="k">int</span> landlock_apply(<span class="k">const</span> policy_t *p) {
+    <span class="k">int</span> abi = ll_create(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+    <span class="k">if</span> (abi &lt; 1) <span class="k">return</span> 0;   <span class="c">/* not available — seccomp still applies */</span>
+
+    <span class="k">struct</span> landlock_ruleset_attr attr = {
+        .handled_access_fs = FS_READ | FS_WRITE |
+                             LANDLOCK_ACCESS_FS_EXECUTE |
+                             LANDLOCK_ACCESS_FS_REFER |
+                             LANDLOCK_ACCESS_FS_TRUNCATE,
+    };
+
+    <span class="c">/* Mask off rights the running kernel does not know about,
+       newest first, falling through to older ABIs. */</span>
+    <span class="k">switch</span> (abi) {
+    <span class="k">case</span> 1:
+        attr.handled_access_fs &amp;= ~LANDLOCK_ACCESS_FS_REFER;
+        __attribute__((fallthrough));
+    <span class="k">case</span> 2:
+        attr.handled_access_fs &amp;= ~LANDLOCK_ACCESS_FS_TRUNCATE;
+        __attribute__((fallthrough));
+    <span class="k">default</span>:
+        <span class="k">break</span>;
+    }
+
+    <span class="k">int</span> rs = ll_create(&amp;attr, <span class="k">sizeof</span>(attr), 0);
+    <span class="k">if</span> (rs &lt; 0) <span class="k">return</span> -1;
+
+    <span class="k">for</span> (size_t i = 0; i &lt; p-&gt;n_paths; i++) {
+        <span class="k">struct</span> landlock_path_beneath_attr pb = {
+            .allowed_access = p-&gt;paths[i].rights &amp; attr.handled_access_fs,
+        };
+        pb.parent_fd = open(p-&gt;paths[i].path, O_PATH | O_CLOEXEC);
+        <span class="k">if</span> (pb.parent_fd &lt; 0) { close(rs); <span class="k">return</span> -1; }
+        <span class="k">int</span> rc = ll_add(rs, LANDLOCK_RULE_PATH_BENEATH, &amp;pb, 0);
+        close(pb.parent_fd);
+        <span class="k">if</span> (rc) { close(rs); <span class="k">return</span> -1; }
+    }
+
+    <span class="c">/* Required before restrict_self for unprivileged processes. */</span>
+    <span class="k">if</span> (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) { close(rs); <span class="k">return</span> -1; }
+
+    <span class="k">int</span> rc = ll_restrict(rs, 0);
+    close(rs);
+    <span class="k">return</span> rc;
+}</pre>
+  </div>
+
+  <div class="note">
+    <span class="tag">Why this closes the pointer gap</span>
+    <p>Landlock enforces on the <em>resolved</em> path inside the kernel's own path-walk, after symlinks are followed. A symlink in <code>/work</code> pointing at <code>/etc/shadow</code> is refused, because resolution and enforcement happen in the same place. There is no window for another thread to swap the path, so the TOCTOU race that defeats userspace path checking does not exist here. Make this the closing argument of your report.</p>
+  </div>
+</section>
+
+<section id="launcher">
+  <p class="sec-eyebrow">Section 11</p>
+  <h2>The launcher</h2>
+  <p>Order matters, and getting it wrong produces a sandbox that silently does nothing.</p>
+
+  <div class="code">
+    <div class="lbl">src/main.c — the critical sequence</div>
+<pre>pid_t pid = fork();
+<span class="k">if</span> (pid == 0) {
+    <span class="c">/* --- child: apply restrictions, then hand over --- */</span>
+
+    <span class="c">/* 1. Lock out privilege gain first. Everything else
+          depends on this being set. */</span>
+    <span class="k">if</span> (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
+        die(<span class="s">"no_new_privs"</span>);
+
+    <span class="c">/* 2. Filesystem restrictions before the syscall filter,
+          because landlock_apply() itself needs open() and
+          the landlock syscalls, which the filter may forbid. */</span>
+    <span class="k">if</span> (landlock_apply(&amp;pol))
+        die(<span class="s">"landlock"</span>);
+
+    <span class="c">/* 3. Syscall filter last. From here on we are restricted. */</span>
+    <span class="k">if</span> (policy_apply(&amp;pol))
+        die(<span class="s">"seccomp"</span>);
+
+    <span class="c">/* 4. Both restrictions survive execve and are inherited
+          by every descendant. There is no way back out. */</span>
+    execvp(argv[optind], &amp;argv[optind]);
+    die(<span class="s">"execvp"</span>);
+}
+
+<span class="c">/* --- parent: unrestricted, reports the verdict --- */</span>
+<span class="k">int</span> status;
+waitpid(pid, &amp;status, 0);
+
+<span class="k">if</span> (WIFSIGNALED(status) &amp;&amp; WTERMSIG(status) == SIGSYS)
+    fprintf(stderr, <span class="s">"palisade: killed — forbidden syscall\n"</span>);
+<span class="k">else if</span> (WIFEXITED(status))
+    fprintf(stderr, <span class="s">"palisade: exited %d\n"</span>, WEXITSTATUS(status));</pre>
+  </div>
+
+  <div class="note warn">
+    <span class="tag">The ordering trap</span>
+    <p>Install the seccomp filter before applying Landlock and your own Landlock setup gets blocked by your own filter. Symptom: <code>landlock_create_ruleset</code> returns <code>EPERM</code>, or the process dies with <code>SIGSYS</code> inside your setup code. Restrictions go from broadest to narrowest, and the filter is always last.</p>
+  </div>
+
+  <p>The parent staying unrestricted is deliberate — it is the only process that can still report what happened, and it demonstrates that seccomp is per-process, not global. That distinction is worth one sentence in the viva.</p>
+</section>
+
+<section id="plan">
+  <p class="sec-eyebrow">Section 12</p>
+  <h2>Session plan</h2>
+  <p>Ten two-hour lab sessions, twenty hours of contact time, with the remaining ten hours for the report and slack. Each session ends with something that runs — a bad week never sinks the project.</p>
+
+  <div class="weeks">
+    <div class="wk"><span class="n">Session 1</span><div><b>Environment and first filter</b><span class="d">VM up, packages installed, all four verification checks passing. Build and run <code>hello_filtered.c</code>. Observe exit code 159.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 2</span><div><b>Argument filtering and default actions</b><span class="d">Restrict <code>write</code> by fd. Compare <code>KILL_PROCESS</code> against <code>ERRNO(EPERM)</code> on the same program. Read a <code>seccomp_export_pfc</code> dump line by line.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 3</span><div><b>Allowlist discovery</b><span class="d">strace a static C binary and a Python script. Build both allowlists by hand. Record the syscall-count gap — this is a report figure.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 4</span><div><b>Policy file and loader</b><span class="d">TOML format, Python parser, C consumer. Three working policies. <code>--dump-filter</code> flag wired up.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 5</span><div><b>Launcher: fork, exec, wait</b><span class="d">Full <code>palisade run</code> path. Verify filter inheritance across <code>execve</code> and into grandchildren. Correct <code>SIGSYS</code> reporting.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 6</span><div><b>Landlock, part one</b><span class="d">ABI negotiation, one read-write path. Prove that a file outside the allowed tree cannot be opened while <code>openat</code> remains permitted.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 7</span><div><b>Landlock, part two</b><span class="d">Multiple paths, read-only and execute rights, correct ordering in the launcher. Symlink-escape test passing.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 8</span><div><b>Benchmarks</b><span class="d">Microbenchmark and macrobenchmark across three configurations. Twenty runs each, median and interquartile range. Generate the plot.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 9</span><div><b>Adversarial tests</b><span class="d">Six escape attempts, all documented, all failing. Add the TSYNC two-thread demonstration.</span></div><span class="h">2h</span></div>
+    <div class="wk"><span class="n">Session 10</span><div><b>Demo rehearsal</b><span class="d">Run the eight-minute script end to end, twice. Fix whatever breaks. Verify on x86_64 via CI.</span></div><span class="h">2h</span></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">Cut list, in order</span>
+    <p>If you fall behind, drop these in sequence: session 9's TSYNC demo, then the macrobenchmark, then Landlock's execute and read-only rights (keep read-write only). The project remains complete and defensible with sessions 1 through 8 alone.</p>
+  </div>
+</section>
+
+<section id="bench">
+  <p class="sec-eyebrow">Section 13</p>
+  <h2>Benchmarks</h2>
+  <p>This section is what separates a good project from a working one. You are measuring the cost of security, which is exactly the trade-off analysis CO2 asks for.</p>
+
+  <h3>Three configurations</h3>
+  <ul>
+    <li><strong>Baseline</strong> — no filter</li>
+    <li><strong>Small filter</strong> — allowlist of about 12 syscalls</li>
+    <li><strong>Large filter</strong> — allowlist of about 70, as a Python policy needs</li>
+  </ul>
+
+  <div class="code">
+    <div class="lbl">bench/syscall_loop.c — the measurement core</div>
+<pre><span class="k">struct</span> timespec t0, t1;
+<span class="k">const long</span> N = 5000000;
+
+clock_gettime(CLOCK_MONOTONIC, &amp;t0);
+<span class="k">for</span> (<span class="k">long</span> i = 0; i &lt; N; i++)
+    syscall(SYS_getpid);          <span class="c">/* bypass glibc caching */</span>
+clock_gettime(CLOCK_MONOTONIC, &amp;t1);
+
+<span class="k">double</span> ns = ((t1.tv_sec - t0.tv_sec) * 1e9 +
+             (t1.tv_nsec - t0.tv_nsec)) / (<span class="k">double</span>)N;
+printf(<span class="s">"%.1f ns/syscall\n"</span>, ns);</pre>
+  </div>
+
+  <div class="note warn">
+    <span class="tag">Two measurement traps</span>
+    <p><strong><code>clock_gettime</code> does not enter the kernel.</strong> It resolves through the vDSO, so it is never seen by your filter and never appears in strace. This is not a bug in your harness — it is a genuinely interesting fact, because it means a class of syscalls is entirely outside seccomp's reach. Put it in the report.</p>
+    <p><strong>Call <code>syscall(SYS_getpid)</code> directly, not <code>getpid()</code>.</strong> Different glibc versions handle caching differently, and you want to measure the kernel boundary, not the library.</p>
+  </div>
+
+  <h3>What you should find</h3>
+  <table class="tbl">
+    <tr><th>Configuration</th><th>Per syscall</th><th>Overhead</th></tr>
+    <tr><td>No filter</td><td>~ 65 ns</td><td>—</td></tr>
+    <tr><td>12-rule filter</td><td>~ 85 ns</td><td>~ 30%</td></tr>
+    <tr><td>70-rule filter</td><td>~ 110 ns</td><td>~ 70%</td></tr>
+  </table>
+
+  <p>Figures are indicative — your hardware will differ, and reporting <em>your</em> numbers is the point. What matters is the shape: cost grows with the number of rules, because libseccomp compiles the allowlist into a chain of comparisons on the syscall number.</p>
+
+  <h3>The analysis that earns the marks</h3>
+  <p>A syscall-loop microbenchmark is a worst case that no real program hits. Follow it with a macrobenchmark — time <code>make</code> on a small C project, or a pytest run, under each configuration. Overhead there will be in low single-digit percent, because real programs spend most of their time in userspace.</p>
+  <p>Then state the conclusion plainly: <strong>syscall filtering is essentially free for real workloads, and this is precisely why user notification is not.</strong> Your 30% microbenchmark overhead is a filter running in kernel context. A user-notification supervisor turns each intercepted call into a context-switch round trip measured in microseconds — three orders of magnitude worse. That is the quantitative justification for the design you chose, and it is the strongest paragraph in your report.</p>
+
+  <p>Run each configuration twenty times, report the median with interquartile range, and pin the process with <code>taskset -c 2</code> to cut scheduler noise.</p>
+</section>
+
+<section id="tests">
+  <p class="sec-eyebrow">Section 14</p>
+  <h2>Test suite</h2>
+  <p>Two kinds. Functional tests prove permitted things work; adversarial tests prove forbidden things fail. The second kind is what makes this a security project.</p>
+
+  <h3>Functional</h3>
+  <div class="code">
+    <div class="lbl">tests/functional.bats</div>
+<pre>@test <span class="s">"allowed write reaches stdout"</span> {
+  run ./palisade run --policy policy/minimal.toml -- /bin/echo hi
+  [ <span class="s">"$status"</span> -eq 0 ]
+  [ <span class="s">"$output"</span> = <span class="s">"hi"</span> ]
+}
+
+@test <span class="s">"forbidden syscall kills with SIGSYS"</span> {
+  run ./palisade run --policy policy/minimal.toml -- ./tests/calls_mount
+  [ <span class="s">"$status"</span> -eq 159 ]
+}
+
+@test <span class="s">"filter survives execve into a child"</span> {
+  run ./palisade run --policy policy/minimal.toml -- ./tests/fork_and_violate
+  [ <span class="s">"$status"</span> -ne 0 ]
+}</pre>
+  </div>
+
+  <h3>Adversarial — one C file each, all must fail</h3>
+  <table class="tbl wide">
+    <tr><th>Attack</th><th>What it tries</th><th>What stops it</th></tr>
+    <tr><td>Symlink escape</td><td>Create <code>/work/link → /etc/shadow</code>, then open it</td><td>Landlock enforces on the resolved path during kernel path-walk</td></tr>
+    <tr><td>Setuid escalation</td><td><code>execve</code> a setuid-root helper</td><td><code>no_new_privs</code> strips the setuid bit's effect</td></tr>
+    <tr><td>Child escape</td><td><code>fork</code>, then call a forbidden syscall in the child</td><td>Filters are inherited across fork and execve, permanently</td></tr>
+    <tr><td>Thread escape</td><td>Second thread calls a forbidden syscall</td><td>TSYNC — and this one <em>succeeds</em> if you forget the flag, which is the demo</td></tr>
+    <tr><td>Filter replacement</td><td>Install a permissive filter over the strict one</td><td>Filters stack and only narrow; a second filter cannot widen the first</td></tr>
+    <tr><td>Relative path walk</td><td><code>openat</code> with <code>../../etc/passwd</code> from inside /work</td><td>Landlock resolves the path before checking, so <code>..</code> gains nothing</td></tr>
+  </table>
+
+  <div class="note">
+    <span class="tag">Write the negative result too</span>
+    <p>If an attack <em>does</em> get through, that is a finding, not a failure — document it, explain the mechanism, and state what would close it. Examiners trust a project that reports a limitation far more than one that claims perfection.</p>
+  </div>
+</section>
+
+<section id="demo">
+  <p class="sec-eyebrow">Section 15</p>
+  <h2>Demo script</h2>
+  <p>Eight minutes. Rehearse it twice in session 10. Have every command in a shell history or a script so you are never typing under pressure.</p>
+
+  <table class="tbl wide">
+    <tr><th>Time</th><th>Beat</th></tr>
+    <tr><td>0:00</td><td><strong>The problem.</strong> Run an untrusted script unsandboxed. Let it read a file it should not and open a network socket. One slide, no code.</td></tr>
+    <tr><td>1:00</td><td><strong>The policy.</strong> Show <code>strict.toml</code> on screen. It is readable prose — the examiner should understand it without explanation.</td></tr>
+    <tr><td>2:00</td><td><strong>Same script, sandboxed.</strong> The file read fails with EPERM, the socket fails with EPERM, the legitimate work still completes.</td></tr>
+    <tr><td>3:00</td><td><strong>Under the hood.</strong> <code>--dump-filter</code> shows the compiled BPF pseudocode. Point at one comparison and one verdict.</td></tr>
+    <tr><td>4:00</td><td><strong>The pointer problem.</strong> Explain why the filter cannot see paths, then show Landlock blocking a symlink escape that seccomp alone would miss. This is the intellectual peak — take your time.</td></tr>
+    <tr><td>5:30</td><td><strong>Escape attempts.</strong> Run the adversarial suite. Six attacks, all refused, in one screenful.</td></tr>
+    <tr><td>6:30</td><td><strong>The cost.</strong> One chart. Microbenchmark overhead versus macrobenchmark overhead, and the one-sentence conclusion.</td></tr>
+    <tr><td>7:30</td><td><strong>What you would build next.</strong> User notification, and the measured reason you did not.</td></tr>
+  </table>
+
+  <div class="note warn">
+    <span class="tag">Demo hygiene</span>
+    <p>Test on the actual lab machine architecture beforehand — see the CI note in section 03. Keep a recorded terminal session (<code>asciinema</code>) as a fallback if the lab environment misbehaves.</p>
+  </div>
+</section>
+
+<section id="report">
+  <p class="sec-eyebrow">Section 16</p>
+  <h2>Report structure</h2>
+  <ol class="body">
+    <li><strong>CO mapping table</strong> — the one from section 02, on page one.</li>
+    <li><strong>Problem statement</strong> — running untrusted code, framed with a concrete case such as agent-generated scripts.</li>
+    <li><strong>Background</strong> — process isolation, the principle of least privilege, where seccomp and LSMs sit in the kernel. Cite Silberschatz chapter 17 and Love chapter 5.</li>
+    <li><strong>Design</strong> — the three layers, the ordering constraint, and why order matters.</li>
+    <li><strong>The pointer-dereference constraint</strong> — its own section. This is your central technical insight.</li>
+    <li><strong>Implementation</strong> — policy format, filter compilation, ABI negotiation, TSYNC.</li>
+    <li><strong>Evaluation</strong> — benchmark tables, the overhead chart, adversarial results.</li>
+    <li><strong>Rejected design: user notification</strong> — the mechanism, the measured cost argument, the conditions under which it would be worth it.</li>
+    <li><strong>Limitations</strong> — no network policy beyond blocking sockets outright, no resource limits (that is cgroups), vDSO calls invisible to the filter.</li>
+    <li><strong>References.</strong></li>
+  </ol>
+  <p>Sections 5 and 8 are where marks are won. Most submissions describe what they built; very few explain a constraint they hit and a design they rejected with numbers behind it.</p>
+</section>
+
+<section id="trouble">
+  <p class="sec-eyebrow">Section 17</p>
+  <h2>Troubleshooting</h2>
+  <table class="tbl wide">
+    <tr><th>Symptom</th><th>Cause and fix</th></tr>
+    <tr><td>Exit code 159, no message</td><td>Working as designed — <code>SIGSYS</code> from a kill verdict. Run under <code>strace</code> to see the last syscall attempted, then add it to the allowlist.</td></tr>
+    <tr><td><code>seccomp_load</code> returns EACCES</td><td><code>no_new_privs</code> not set. libseccomp normally handles this; you have probably cleared <code>SCMP_FLTATR_CTL_NNP</code>.</td></tr>
+    <tr><td><code>landlock_create_ruleset</code> returns ENOSYS</td><td>Kernel too old, or Landlock absent from the LSM list. Check <code>/sys/kernel/security/lsm</code> — see section 05.</td></tr>
+    <tr><td><code>landlock_create_ruleset</code> returns EINVAL</td><td>You requested an access right the running ABI does not support. Your ABI masking switch is wrong or missing.</td></tr>
+    <tr><td>Program dies before <code>main</code></td><td>The dynamic loader needs syscalls too — typically <code>mmap</code>, <code>mprotect</code>, <code>openat</code>, <code>read</code>, <code>close</code>, <code>newfstatat</code>. Build a static binary to isolate whether the problem is your program or ld.so.</td></tr>
+    <tr><td>Works in the VM, fails on the lab PC</td><td>Hardcoded syscall numbers. Grep your source for numeric literals and replace them with <code>SCMP_SYS()</code>.</td></tr>
+    <tr><td>Second thread bypasses the filter</td><td>Missing <code>SCMP_FLTATR_CTL_TSYNC</code>. Keep this reproducible — it is a demo, not just a bug.</td></tr>
+    <tr><td>strace shows nothing for a call</td><td>It resolved through the vDSO and never entered the kernel. Expected for <code>clock_gettime</code>, <code>gettimeofday</code>, <code>getcpu</code>.</td></tr>
+    <tr><td>Everything blocked despite a large allowlist</td><td>Rules added after <code>seccomp_load</code>, or added to a context you then released. Dump the filter with <code>seccomp_export_pfc</code> and read what actually compiled.</td></tr>
+  </table>
+</section>
+
+<section id="refs">
+  <p class="sec-eyebrow">Section 18</p>
+  <h2>References</h2>
+
+  <h4>Course texts</h4>
+  <ul>
+    <li>Fox, R. <em>Linux with Operating System Concepts</em>, 2nd ed., Chapman and Hall/CRC, 2022.</li>
+    <li>Love, R. <em>Linux System Programming</em>, 2nd ed., O'Reilly, 2013 — chapter 5 on process management, chapter 10 on signals.</li>
+    <li>Silberschatz, Galvin, Gagne. <em>Operating System Concepts</em>, 10th ed., Wiley, 2018 — chapter 17 on protection, chapter 16 on security.</li>
+  </ul>
+
+  <h4>Primary sources</h4>
+  <ul>
+    <li><code>man 2 seccomp</code>, <code>man 2 prctl</code>, <code>man 7 landlock</code> — read these before searching the web; they are the authority.</li>
+    <li>Kernel documentation: <code>Documentation/userspace-api/seccomp_filter.rst</code> and <code>Documentation/userspace-api/landlock.rst</code>.</li>
+    <li>libseccomp API reference — <code>man 3 seccomp_rule_add</code> covers the argument-comparison syntax you will use most.</li>
+  </ul>
+
+  <h4>Worth reading for context</h4>
+  <ul>
+    <li>Chromium's sandbox design documents — the original production driver for seccomp-bpf.</li>
+    <li>OpenSSH's <code>sandbox-seccomp-filter.c</code> — a short, real, well-commented allowlist in production use.</li>
+  </ul>
+</section>
+
+</main>
+</div>
+</div>
+
+<footer>
+  <div class="wrap">Palisade · BCSE303P Operating Systems Lab · build guide
+</div>
+</footer>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var secs  = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function mark(){
+    var y = window.scrollY + 90, idx = 0;
+    for (var i=0;i<secs.length;i++){ if(secs[i] && secs[i].offsetTop <= y) idx = i; }
+    links.forEach(function(a,i){ a.classList.toggle('on', i===idx); });
+  }
+  window.addEventListener('scroll', mark, {passive:true});
+  mark();
+})();
+</script>
+
+</body>
+</html>

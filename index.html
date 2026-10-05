@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OS Visualizer</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <h1>OS Visualizer</h1>
+      <nav class="tabs" aria-label="Sections">
+        <button class="tab" data-view="scheduling" aria-current="page">CPU scheduling</button>
+        <button class="tab" data-view="memory">Paging</button>
+        <button class="tab" data-view="fragmentation">Fragmentation</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================== CPU scheduling ============================== -->
+  <div id="view-scheduling">
+    <main class="wrap layout">
+      <section class="card" aria-labelledby="h-workload">
+        <div class="card-head">
+          <h2 id="h-workload">Workload</h2>
+          <select id="preset" aria-label="Load an example workload"></select>
+        </div>
+
+        <table id="proc-table" class="procs">
+          <thead>
+            <tr>
+              <th scope="col">Process</th>
+              <th scope="col">Arrival</th>
+              <th scope="col">Burst</th>
+              <th scope="col" class="col-priority">Priority</th>
+              <th scope="col"><span class="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody id="proc-body"></tbody>
+        </table>
+        <button id="add-proc" class="btn">+ Add process</button>
+
+        <div class="random-row">
+          <button id="random" class="btn" type="button" title="Generate a random workload from a seed">Random workload</button>
+          <label class="seed">Seed <input id="seed" type="number" min="1" step="1" inputmode="numeric" placeholder="auto" aria-label="Random seed"></label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span id="lane-a-title">Algorithm</span>
+            <select id="algo"></select>
+          </label>
+          <label class="field" id="quantum-wrap">
+            <span>Time quantum</span>
+            <input id="quantum" type="number" min="1" step="1" value="4" inputmode="numeric">
+          </label>
+        </div>
+        <p id="algo-hint" class="hint"></p>
+
+        <label class="check"><input id="compare" type="checkbox"> Compare with a second algorithm</label>
+        <div id="lane-b" hidden>
+          <div class="field-row">
+            <label class="field">
+              <span>Algorithm B</span>
+              <select id="algo-b"></select>
+            </label>
+            <label class="field" id="quantum-wrap-b">
+              <span>Time quantum</span>
+              <input id="quantum-b" type="number" min="1" step="1" value="4" inputmode="numeric">
+            </label>
+          </div>
+          <p id="algo-hint-b" class="hint"></p>
+        </div>
+        <p id="error" class="error" role="alert" hidden></p>
+      </section>
+
+      <div class="stack">
+        <section class="card" aria-labelledby="h-gantt">
+          <div class="card-head">
+            <h2 id="h-gantt">Gantt chart</h2>
+            <span id="clock" class="clock" aria-live="off">t = 0</span>
+          </div>
+          <div id="gantt" class="gantt-scroll"></div>
+          <div id="transport"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-now">
+          <h2 id="h-now">Now</h2>
+          <div id="now" class="now-grid"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-results">
+          <h2 id="h-results">Results</h2>
+          <div id="single-results">
+            <div id="stats" class="stats"></div>
+            <div class="table-scroll">
+              <table class="results">
+                <thead>
+                  <tr>
+                    <th scope="col">Process</th>
+                    <th scope="col">State</th>
+                    <th scope="col">Progress</th>
+                    <th scope="col" class="n" title="Completion time">Done at</th>
+                    <th scope="col" class="n" title="Turnaround = completion − arrival">Turnaround</th>
+                    <th scope="col" class="n" title="Waiting = turnaround − burst">Waiting</th>
+                    <th scope="col" class="n" title="Response = first run − arrival">Response</th>
+                  </tr>
+                </thead>
+                <tbody id="results-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="compare-results" hidden></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============================== Memory ============================== -->
+  <div id="view-memory" hidden>
+    <main class="wrap layout">
+      <section class="card" aria-labelledby="h-mem-workload">
+        <div class="card-head">
+          <h2 id="h-mem-workload">Page replacement</h2>
+          <select id="mem-preset" aria-label="Load an example"></select>
+        </div>
+
+        <label class="field">
+          <span>Reference string <small>(page numbers, separated by commas or spaces)</small></span>
+          <textarea id="mem-refs" class="mono" rows="3" spellcheck="false" autocomplete="off"></textarea>
+        </label>
+
+        <div class="random-row">
+          <button id="mem-random" class="btn" type="button" title="Generate a random workload from a seed">Random workload</button>
+          <label class="seed">Seed <input id="mem-seed" type="number" min="1" step="1" inputmode="numeric" placeholder="auto" aria-label="Random seed"></label>
+        </div>
+
+        <div class="field-row two">
+          <label class="field">
+            <span id="mem-lane-a-frames">Frames</span>
+            <input id="mem-frames" type="number" min="1" max="64" step="1" value="3" inputmode="numeric">
+          </label>
+          <label class="field">
+            <span id="mem-lane-a-algo">Algorithm</span>
+            <select id="mem-algo"></select>
+          </label>
+        </div>
+        <p id="mem-hint" class="hint"></p>
+
+        <label class="check"><input id="mem-compare" type="checkbox"> Compare with a second setup</label>
+        <div id="mem-lane-b" hidden>
+          <div class="field-row two">
+            <label class="field">
+              <span>Frames B</span>
+              <input id="mem-frames-b" type="number" min="1" max="64" step="1" value="3" inputmode="numeric">
+            </label>
+            <label class="field">
+              <span>Algorithm B</span>
+              <select id="mem-algo-b"></select>
+            </label>
+          </div>
+          <p id="mem-hint-b" class="hint"></p>
+        </div>
+        <p id="mem-error" class="error" role="alert" hidden></p>
+      </section>
+
+      <div class="stack">
+        <section class="card" aria-labelledby="h-mem-frames">
+          <div class="card-head">
+            <h2 id="h-mem-frames">Page frames</h2>
+            <span id="mem-clock" class="clock" aria-live="off">ref 0 / 0</span>
+          </div>
+          <div id="mem-tables"></div>
+          <p class="legend">
+            <span><span class="key fault">F</span> page fault</span>
+            <span><span class="key hit">H</span> hit</span>
+            <span><span class="key ev">−7</span> page 7 evicted</span>
+            <span id="mem-legend-diff" hidden><span class="key diff">F</span> the two setups differ here</span>
+          </p>
+          <div id="mem-transport"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-mem-now">
+          <h2 id="h-mem-now">Now</h2>
+          <div id="mem-now" class="mem-now"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-mem-results">
+          <h2 id="h-mem-results">Results</h2>
+          <div id="mem-stats" class="stats"></div>
+          <div id="mem-compare-results" hidden></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============================== Fragmentation ============================== -->
+  <div id="view-fragmentation" hidden>
+    <main class="wrap layout">
+      <section class="card" aria-labelledby="h-frag-workload">
+        <div class="card-head">
+          <h2 id="h-frag-workload">Partitions</h2>
+          <select id="frag-preset" aria-label="Load an example"></select>
+        </div>
+
+        <label class="field">
+          <span>Memory scheme</span>
+          <select id="frag-mode"></select>
+        </label>
+        <p id="frag-mode-hint" class="hint"></p>
+
+        <label class="field" id="frag-partitions-wrap">
+          <span>Partition sizes <small>(KB, in address order)</small></span>
+          <input id="frag-partitions" class="mono" type="text" spellcheck="false" autocomplete="off" inputmode="numeric">
+        </label>
+        <label class="field" id="frag-size-wrap">
+          <span>Memory size <small>(KB)</small></span>
+          <input id="frag-size" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+
+        <label class="field">
+          <span>Requests <small>("P1 212" allocates 212 KB, "free P1" releases it; commas or new lines)</small></span>
+          <textarea id="frag-ops" class="mono" rows="3" spellcheck="false" autocomplete="off"></textarea>
+        </label>
+        <div class="random-row">
+          <button id="frag-random" class="btn" type="button" title="Generate a random workload from a seed">Random workload</button>
+          <label class="seed">Seed <input id="frag-seed" type="number" min="1" step="1" inputmode="numeric" placeholder="auto" aria-label="Random seed"></label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span id="frag-lane-a-title">Placement strategy</span>
+            <select id="frag-strategy"></select>
+          </label>
+        </div>
+        <p id="frag-hint" class="hint"></p>
+
+        <label class="check"><input id="frag-compare" type="checkbox"> Compare with a second strategy</label>
+        <div id="frag-lane-b" hidden>
+          <div class="field-row">
+            <label class="field">
+              <span>Strategy B</span>
+              <select id="frag-strategy-b"></select>
+            </label>
+          </div>
+          <p id="frag-hint-b" class="hint"></p>
+        </div>
+        <p id="frag-error" class="error" role="alert" hidden></p>
+      </section>
+
+      <div class="stack">
+        <section class="card" aria-labelledby="h-frag-map">
+          <div class="card-head">
+            <h2 id="h-frag-map">Memory map</h2>
+            <span id="frag-clock" class="clock" aria-live="off">request 0 / 0</span>
+          </div>
+          <div id="frag-maps"></div>
+          <p class="legend">
+            <span><span class="key sw owner"></span> process</span>
+            <span><span class="key sw free"></span> free</span>
+            <span><span class="key sw waste"></span> internal fragmentation</span>
+          </p>
+          <div id="frag-transport"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-frag-now">
+          <h2 id="h-frag-now">Now</h2>
+          <div id="frag-now" class="mem-now"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-frag-results">
+          <h2 id="h-frag-results">Results</h2>
+          <div id="frag-single-results">
+            <div id="frag-stats" class="stats"></div>
+            <div class="table-scroll">
+              <table class="results">
+                <thead>
+                  <tr>
+                    <th scope="col">Address</th>
+                    <th scope="col" class="n">Size</th>
+                    <th scope="col">Holds</th>
+                    <th scope="col" class="n" title="Space inside the block the process does not use">Wasted</th>
+                  </tr>
+                </thead>
+                <tbody id="frag-blocks"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="frag-compare-results" hidden></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <noscript><p class="wrap">This tool needs JavaScript.</p></noscript>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
