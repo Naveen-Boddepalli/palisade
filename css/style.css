@@ -13,6 +13,14 @@
   --warn: #9a6100;
   --lane-b: #b45309;
   --lane-b-ink: #ffffff;
+  --lane-c: #0f766e;
+  --lane-c-ink: #ffffff;
+  --lane-d: #7c3aed;
+  --lane-d-ink: #ffffff;
+  --lane-e: #c026d3;
+  --lane-e-ink: #ffffff;
+  --lane-f: #0284c7;
+  --lane-f-ink: #ffffff;
   --radius: 10px;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -35,6 +43,14 @@
     --warn: #e0b04a;
     --lane-b: #f0a35e;
     --lane-b-ink: #1c1207;
+    --lane-c: #2dd4bf;
+    --lane-c-ink: #042f2e;
+    --lane-d: #a78bfa;
+    --lane-d-ink: #1e1035;
+    --lane-e: #f472b6;
+    --lane-e-ink: #370617;
+    --lane-f: #38bdf8;
+    --lane-f-ink: #082f49;
     color-scheme: dark;
   }
 }
@@ -238,6 +254,12 @@ textarea { resize: vertical; line-height: 1.45; }
 }
 .lane-tag.a { background: var(--accent); color: var(--accent-ink); }
 .lane-tag.b { background: var(--lane-b); color: var(--lane-b-ink); }
+.lane-tag.c { background: var(--lane-c); color: var(--lane-c-ink); }
+.lane-tag.d { background: var(--lane-d); color: var(--lane-d-ink); }
+.lane-tag.e { background: var(--lane-e); color: var(--lane-e-ink); }
+.lane-tag.f { background: var(--lane-f); color: var(--lane-f-ink); }
+.subhead { font-size: 13px; margin: 16px 0 6px; color: var(--muted); font-weight: 600; }
+.per-proc-block + .per-proc-block { margin-top: 14px; }
 .lane-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 4px 0 2px; }
 
 .gantt-scroll .lane { width: max-content; min-width: 100%; }

@@ -9,5 +9,12 @@ export const num = (s) => (s === '' || s == null ? NaN : Number(s));
 export const statTile = (label, value, unit = '') =>
   h('div', { class: 'stat' }, h('span', { class: 'k' }, label), h('b', {}, value, h('small', {}, unit)));
 
-/** The coloured A / B badge that ties a lane's controls, chart and results together. */
-export const laneTag = (index) => h('span', { class: `lane-tag ${'ab'[index]}`, title: `Lane ${'AB'[index]}` }, 'AB'[index]);
+const LANE_CLASSES = ['a', 'b', 'c', 'd', 'e', 'f'];
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/** The coloured badge (A, B, C, ...) that ties a lane's controls, chart and results together. */
+export const laneTag = (index) => {
+  const cls = LANE_CLASSES[index] ?? 'other';
+  const letter = LETTERS[index] ?? String(index + 1);
+  return h('span', { class: `lane-tag ${cls}`, title: `Lane ${letter}` }, letter);
+};

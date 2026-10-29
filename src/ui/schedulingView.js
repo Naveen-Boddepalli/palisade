@@ -1,5 +1,5 @@
 import { ALGORITHMS, simulate } from '../engine/scheduling.js';
-import { compareSchedulingRuns, describeSchedulingRun } from '../engine/compare.js';
+import { compareSchedulingRuns, compareAllSchedulingRuns, describeSchedulingRun } from '../engine/compare.js';
 import { randomProcesses, newSeed } from '../engine/workload.js';
 import { PRESETS, DEFAULT_PRESET } from '../presets.js';
 import { Player, mountTransport } from './controls.js';
@@ -11,6 +11,8 @@ const pidOf = (i) => `P${i + 1}`;
 const indexOf = (pid) => Number(pid.slice(1)) - 1;
 const colorOf = (pid) => pidColor(indexOf(pid));
 const pill = (pid) => h('span', { class: 'pill', style: { background: colorOf(pid) } }, pid);
+
+const ALL_ALGORITHMS = ['fcfs', 'sjf', 'srtf', 'priority-np', 'priority-p', 'rr'];
 
 /** What actually configures a lane: the quantum only matters to algorithms that use one. */
 const laneKey = (lane) => (ALGORITHMS[lane.algorithm].usesQuantum ? `${lane.algorithm}:${lane.quantum}` : lane.algorithm);
@@ -32,7 +34,7 @@ function eventText(e) {
 export function mountSchedulingView() {
   const el = Object.fromEntries(
     ['preset', 'random', 'seed', 'proc-table', 'proc-body', 'add-proc', 'lane-a-title', 'algo', 'quantum', 'quantum-wrap', 'algo-hint',
-      'compare', 'lane-b', 'algo-b', 'quantum-b', 'quantum-wrap-b', 'algo-hint-b', 'error',
+      'all-algos', 'compare', 'lane-b', 'algo-b', 'quantum-b', 'quantum-wrap-b', 'algo-hint-b', 'error',
       'gantt', 'clock', 'transport', 'now', 'single-results', 'stats', 'results-body', 'compare-results']
       .map((id) => [id, $(`#${id}`)]),
   );
@@ -45,6 +47,7 @@ export function mountSchedulingView() {
   const model = {
     rows: [],
     compare: false,
+    all: false,
     lanes: [{ algorithm: 'srtf', quantum: '4' }, { algorithm: 'sjf', quantum: '4' }],
   };
   let runs = []; // one simulation per active lane
@@ -54,7 +57,13 @@ export function mountSchedulingView() {
 
   const player = new Player(onFrame);
   const transport = mountTransport(el.transport, player);
-  const activeLanes = () => model.lanes.slice(0, model.compare ? 2 : 1);
+  const activeLanes = () => {
+    if (model.all) {
+      const q = model.lanes[0].quantum || '4';
+      return ALL_ALGORITHMS.map((algo) => ({ algorithm: algo, quantum: q }));
+    }
+    return model.lanes.slice(0, model.compare ? 2 : 1);
+  };
 
   // ---------------------------------------------------------------- workload table
 
@@ -77,6 +86,21 @@ export function mountSchedulingView() {
 
   /** Push the model into the lane controls and show / hide what the mode needs. */
   function syncControls() {
+    if (model.all) {
+      el['all-algos'].checked = true;
+      el.compare.checked = false;
+      el['lane-b'].hidden = true;
+      el['lane-a-title'].textContent = 'Algorithm';
+      el.algo.value = 'all';
+      fields[0].hint.textContent = 'Comparing all 6 CPU scheduling algorithms side by side. Time quantum applies to Round Robin.';
+      fields[0].wrap.hidden = false;
+      if (fields[0].quantum.value !== model.lanes[0].quantum) fields[0].quantum.value = model.lanes[0].quantum;
+      el['proc-table'].classList.add('show-priority');
+      el['single-results'].hidden = true;
+      el['compare-results'].hidden = false;
+      return;
+    }
+    el['all-algos'].checked = false;
     model.lanes.forEach((lane, i) => {
       const algo = ALGORITHMS[lane.algorithm];
       if (fields[i].algo.value !== lane.algorithm) fields[i].algo.value = lane.algorithm;
@@ -98,11 +122,21 @@ export function mountSchedulingView() {
     model.rows = preset.rows.map(([arrival, burst, priority]) => ({
       arrival: String(arrival), burst: String(burst), priority: String(priority),
     }));
-    model.lanes[0] = { algorithm: preset.algorithm, quantum: String(preset.quantum ?? model.lanes[0].quantum) };
-    if (preset.versus) {
-      model.lanes[1] = { algorithm: preset.versus.algorithm, quantum: String(preset.versus.quantum ?? model.lanes[1].quantum) };
+    if (preset.all) {
+      model.all = true;
+      model.compare = false;
+    } else {
+      if (preset.algorithm) {
+        model.lanes[0] = { algorithm: preset.algorithm, quantum: String(preset.quantum ?? model.lanes[0].quantum) };
+      }
+      if (preset.versus) {
+        model.lanes[1] = { algorithm: preset.versus.algorithm, quantum: String(preset.versus.quantum ?? model.lanes[1].quantum) };
+      }
+      if (preset.compare) {
+        model.compare = true;
+        model.all = false;
+      }
     }
-    model.compare = !!preset.compare;
     renderTable();
     syncControls();
     recompute();
@@ -128,7 +162,7 @@ export function mountSchedulingView() {
         try {
           return simulate(input, lane.algorithm, { quantum: num(lane.quantum) });
         } catch (err) {
-          throw new Error(model.compare ? `Algorithm ${'AB'[i]}: ${err.message}` : err.message);
+          throw new Error(model.all ? `${describeSchedulingRun(lane)}: ${err.message}` : (model.compare ? `Algorithm ${'AB'[i]}: ${err.message}` : err.message));
         }
       });
       el.error.hidden = true;
@@ -144,7 +178,8 @@ export function mountSchedulingView() {
       const duration = Math.max(...runs.map((r) => r.makespan));
       buildCharts();
       transport.setDuration(duration);
-      if (model.compare) renderComparison();
+      if (model.all) renderAllComparison();
+      else if (model.compare) renderComparison();
       else renderStats(runs[0]);
       player.load(duration);
     } else {
@@ -162,7 +197,7 @@ export function mountSchedulingView() {
     ganttWidth = el.gantt.clientWidth;
     const lanes = runs.map((run, i) =>
       h('div', { class: 'lane' },
-        h('div', { class: 'lane-label' }, model.compare ? laneTag(i) : null, describeSchedulingRun(run)),
+        h('div', { class: 'lane-label' }, (model.compare || model.all) ? laneTag(i) : null, describeSchedulingRun(run)),
         h('div', { class: 'lane-chart' })));
     el.gantt.replaceChildren(...lanes);
     charts = runs.map((run, i) =>
@@ -216,6 +251,96 @@ export function mountSchedulingView() {
     );
   }
 
+  function renderAllComparison() {
+    const cmp = compareAllSchedulingRuns(runs);
+    const isBest = (metric, i) => (metric.bestIndices.includes(i) ? 'n best' : 'n');
+
+    const summaryTable = h('table', { class: 'results compare' },
+      h('thead', {},
+        h('tr', {},
+          h('th', { scope: 'col' }, 'Algorithm'),
+          h('th', { scope: 'col', class: 'n' }, 'Avg Waiting'),
+          h('th', { scope: 'col', class: 'n' }, 'Avg Turnaround'),
+          h('th', { scope: 'col', class: 'n' }, 'Avg Response'),
+          h('th', { scope: 'col', class: 'n' }, 'CPU Util'),
+          h('th', { scope: 'col', class: 'n' }, 'Context Switches'),
+          h('th', { scope: 'col', class: 'n' }, 'Total Time'),
+        ),
+      ),
+      h('tbody', {},
+        ...runs.map((run, i) => {
+          const m = run.metrics;
+          const waitMetric = cmp.metrics.find((x) => x.key === 'avgWaiting');
+          const turnMetric = cmp.metrics.find((x) => x.key === 'avgTurnaround');
+          const respMetric = cmp.metrics.find((x) => x.key === 'avgResponse');
+          const utilMetric = cmp.metrics.find((x) => x.key === 'cpuUtilization');
+          const csMetric = cmp.metrics.find((x) => x.key === 'contextSwitches');
+          const timeMetric = cmp.metrics.find((x) => x.key === 'makespan');
+
+          return h('tr', {},
+            h('th', { scope: 'row' },
+              laneTag(i),
+              h('span', { class: 'lane-name' }, ` ${describeSchedulingRun(run)}`),
+            ),
+            h('td', { class: isBest(waitMetric, i) }, fmt(m.avgWaiting)),
+            h('td', { class: isBest(turnMetric, i) }, fmt(m.avgTurnaround)),
+            h('td', { class: isBest(respMetric, i) }, fmt(m.avgResponse)),
+            h('td', { class: isBest(utilMetric, i) }, `${m.cpuUtilization.toFixed(1)}%`),
+            h('td', { class: isBest(csMetric, i) }, m.contextSwitches),
+            h('td', { class: isBest(timeMetric, i) }, m.makespan),
+          );
+        }),
+      ),
+    );
+
+    const buildProcTable = (title, key, formatFn = (v) => v) => {
+      const colHeads = runs.map((run, i) =>
+        h('th', { scope: 'col', class: 'n' }, laneTag(i), h('span', { class: 'lane-name' }, ` ${describeSchedulingRun(run)}`)),
+      );
+      const rows = cmp.perProcess.map((p) => {
+        const item = p[key];
+        return h('tr', {},
+          h('th', { scope: 'row' }, pill(p.pid)),
+          ...runs.map((_, i) =>
+            h('td', { class: item.bestIndices.includes(i) ? 'n best' : 'n' }, formatFn(item.values[i])),
+          ),
+        );
+      });
+      const avgMetric = cmp.metrics.find((m) =>
+        (key === 'waiting' ? m.key === 'avgWaiting' : key === 'turnaround' ? m.key === 'avgTurnaround' : m.key === 'avgResponse'),
+      );
+      if (avgMetric) {
+        rows.push(
+          h('tr', { class: 'avg' },
+            h('th', { scope: 'row' }, 'Average'),
+            ...runs.map((_, i) =>
+              h('td', { class: avgMetric.bestIndices.includes(i) ? 'n best' : 'n' }, fmt(avgMetric.values[i])),
+            ),
+          ),
+        );
+      }
+      return h('div', { class: 'per-proc-block' },
+        h('h4', { class: 'subhead' }, title),
+        h('div', { class: 'table-scroll' },
+          h('table', { class: 'results compare' },
+            h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Process'), ...colHeads)),
+            h('tbody', {}, ...rows),
+          ),
+        ),
+      );
+    };
+
+    el['compare-results'].replaceChildren(
+      h('p', { class: 'verdict' }, cmp.verdict),
+      h('div', { class: 'table-scroll' }, summaryTable),
+      h('h3', {}, 'Per-process results across algorithms'),
+      buildProcTable('Waiting Time', 'waiting'),
+      buildProcTable('Turnaround Time', 'turnaround'),
+      buildProcTable('Response Time', 'response'),
+      h('p', { class: 'muted small' }, 'Shaded cells indicate the best performing algorithm for each metric or process.'),
+    );
+  }
+
   function stateOf(snap, pid) {
     if (snap.running === pid) return 'running';
     if (snap.ready.includes(pid)) return 'ready';
@@ -246,7 +371,7 @@ export function mountSchedulingView() {
     const snap = run.snapshots[k];
     const rr = ALGORITHMS[run.algorithm].kind === 'rr';
     return h('div', {},
-      model.compare ? h('div', { class: 'lane-label' }, laneTag(lane), describeSchedulingRun(run)) : null,
+      (model.compare || model.all) ? h('div', { class: 'lane-label' }, laneTag(lane), describeSchedulingRun(run)) : null,
       h('h3', {}, 'CPU'),
       h('div', { class: 'cpu' },
         snap.running
@@ -277,7 +402,7 @@ export function mountSchedulingView() {
     el.clock.textContent = `t = ${t}`;
 
     const ks = runs.map((run) => Math.min(t, run.makespan)); // a shorter run holds at its final state
-    if (model.compare) {
+    if (model.compare || model.all) {
       el.now.replaceChildren(...runs.map((run, i) => statusBlock(run, ks[i], i)));
     } else {
       el.now.replaceChildren(statusBlock(runs[0], ks[0], 0), eventsBlock(runs[0], ks[0]));
@@ -308,7 +433,13 @@ export function mountSchedulingView() {
 
   fields.forEach((f, i) => {
     f.algo.addEventListener('change', () => {
-      model.lanes[i].algorithm = f.algo.value;
+      if (i === 0 && f.algo.value === 'all') {
+        model.all = true;
+        model.compare = false;
+      } else {
+        if (i === 0) model.all = false;
+        model.lanes[i].algorithm = f.algo.value;
+      }
       syncControls();
       recompute();
     });
@@ -318,13 +449,25 @@ export function mountSchedulingView() {
     });
   });
 
+  el['all-algos'].addEventListener('change', () => {
+    model.all = el['all-algos'].checked;
+    if (model.all) {
+      model.compare = false;
+    }
+    syncControls();
+    recompute();
+  });
+
   el.compare.addEventListener('change', () => {
     model.compare = el.compare.checked;
-    const [a, b] = model.lanes;
-    if (model.compare && laneKey(a) === laneKey(b)) {
-      // Comparing something with itself is pointless: start lane B on the next algorithm.
-      const ids = Object.keys(ALGORITHMS);
-      b.algorithm = ids[(ids.indexOf(a.algorithm) + 1) % ids.length];
+    if (model.compare) {
+      model.all = false;
+      const [a, b] = model.lanes;
+      if (laneKey(a) === laneKey(b)) {
+        // Comparing something with itself is pointless: start lane B on the next algorithm.
+        const ids = Object.keys(ALGORITHMS);
+        b.algorithm = ids[(ids.indexOf(a.algorithm) + 1) % ids.length];
+      }
     }
     syncControls();
     recompute();
@@ -346,9 +489,13 @@ export function mountSchedulingView() {
 
   // ---------------------------------------------------------------- start
 
-  const algoOptions = () => Object.values(ALGORITHMS).map((a) => h('option', { value: a.id }, a.label));
+  const algoOptions = () => [
+    ...Object.values(ALGORITHMS).map((a) => h('option', { value: a.id }, a.label)),
+    h('option', { value: 'all' }, 'All algorithms (compare all)'),
+  ];
+  const laneBOptions = () => Object.values(ALGORITHMS).map((a) => h('option', { value: a.id }, a.label));
   el.algo.replaceChildren(...algoOptions());
-  el['algo-b'].replaceChildren(...algoOptions());
+  el['algo-b'].replaceChildren(...laneBOptions());
   el.preset.replaceChildren(
     h('option', { value: '' }, 'Load an example…'),
     ...PRESETS.map((p) => h('option', { value: p.id }, p.label)),

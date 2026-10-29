@@ -7,7 +7,7 @@ BCSE303P (Operating Systems Lab). Plain JavaScript modules and SVG, no framework
 
 ```bash
 npm start      # http://localhost:8000  (ES modules need http, not file://)
-npm test       # 79 engine tests, no dependencies (node --test)
+npm test       # 82 engine tests, no dependencies (node --test)
 ```
 
 ## What it does
@@ -21,7 +21,7 @@ npm test       # 79 engine tests, no dependencies (node --test)
 Every tab has:
 
 - **Playback**: play, pause, step, scrub, speed, and Space / arrow keys.
-- **Compare**: tick *Compare* to run two algorithms (or two frame counts, or two placement strategies) on the same workload, on one clock, with a metrics table and a verdict.
+- **Compare & All Algorithms**: tick *Compare* to run two algorithms side by side, or tick *Show result of all algorithms on this example* (or choose *All algorithms* in the dropdown) to evaluate and animate all algorithms simultaneously on one shared clock, with a summary leaderboard, per-process breakdown, and verdict.
 - **Random workload**: a seed is shown next to the button; type it back in to reproduce the same workload.
 - **Examples**: presets for the classic textbook cases.
 

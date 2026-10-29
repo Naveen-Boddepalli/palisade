@@ -65,6 +65,12 @@ export const PRESETS = [
     versus: { algorithm: 'rr', quantum: 6 },
     rows: [[0, 10, 1], [0, 5, 1], [0, 8, 1]],
   },
+  {
+    id: 'all-algos',
+    label: 'All algorithms: side by side',
+    all: true,
+    rows: [[0, 8, 1], [1, 4, 1], [2, 9, 1], [3, 5, 1]],
+  },
 ];
 
 export const DEFAULT_PRESET = 'srtf';
@@ -133,6 +139,14 @@ export const MEMORY_PRESETS = [
     versus: { algorithm: 'opt', frames: 4 },
     refs: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
   },
+  {
+    id: 'all-paging',
+    label: 'All algorithms: FIFO, LRU, Optimal',
+    all: true,
+    algorithm: 'fifo',
+    frames: 3,
+    refs: [7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 2, 1, 2, 0, 1, 7, 0, 1],
+  },
 ];
 
 export const DEFAULT_MEMORY_PRESET = 'textbook';
@@ -190,6 +204,16 @@ export const FRAG_PRESETS = [
     partitions: '100, 500, 200, 300, 600',
     size: 1000,
     ops: 'P1 250, P2 150, P3 300, free P2, P4 100, free P1, P5 200, P6 120, free P3, P7 350',
+  },
+  {
+    id: 'all-frag',
+    label: 'All strategies: First, Best, Worst fit',
+    all: true,
+    mode: 'fixed',
+    strategy: 'first',
+    partitions: '100, 500, 200, 300, 600',
+    size: 1700,
+    ops: 'P1 212, P2 417, P3 112, P4 426',
   },
 ];
 

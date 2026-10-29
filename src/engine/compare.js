@@ -96,3 +96,149 @@ export function comparePagingRuns(a, b) {
 
   return { metrics, verdict, anomaly, differs, differCount: differs.filter(Boolean).length };
 }
+
+/**
+ * Compare multiple scheduling runs (e.g. all available algorithms) on the same workload.
+ */
+export function compareAllSchedulingRuns(runs) {
+  if (!Array.isArray(runs) || runs.length === 0) throw new Error('At least one run is required.');
+  const longestWait = (run) => Math.max(...run.processes.map((p) => p.waiting));
+
+  const metricDefs = [
+    { key: 'avgWaiting', label: 'Avg waiting time', getValue: (r) => r.metrics.avgWaiting, higherIsBetter: false },
+    { key: 'avgTurnaround', label: 'Avg turnaround time', getValue: (r) => r.metrics.avgTurnaround, higherIsBetter: false },
+    { key: 'avgResponse', label: 'Avg response time', getValue: (r) => r.metrics.avgResponse, higherIsBetter: false },
+    { key: 'maxWaiting', label: 'Longest wait', getValue: (r) => longestWait(r), higherIsBetter: false },
+    { key: 'cpuUtilization', label: 'CPU utilization', getValue: (r) => r.metrics.cpuUtilization, higherIsBetter: true },
+    { key: 'contextSwitches', label: 'Context switches', getValue: (r) => r.metrics.contextSwitches, higherIsBetter: false },
+    { key: 'makespan', label: 'Total time', getValue: (r) => r.metrics.makespan, higherIsBetter: false },
+  ];
+
+  function findBest(values, higherIsBetter) {
+    if (!values.length) return { bestIndices: [], bestValue: null };
+    let best = values[0];
+    for (let i = 1; i < values.length; i++) {
+      const v = values[i];
+      if (higherIsBetter ? (v > best + EPS) : (v < best - EPS)) {
+        best = v;
+      }
+    }
+    const bestIndices = values
+      .map((v, i) => (Math.abs(v - best) < EPS ? i : -1))
+      .filter((i) => i !== -1);
+    return { bestIndices, bestValue: best };
+  }
+
+  const metrics = metricDefs.map((def) => {
+    const values = runs.map(def.getValue);
+    const { bestIndices, bestValue } = findBest(values, def.higherIsBetter);
+    return {
+      key: def.key,
+      label: def.label,
+      higherIsBetter: def.higherIsBetter,
+      values,
+      bestIndices,
+      bestValue,
+    };
+  });
+
+  const perProcess = runs[0].processes.map((proc, pIdx) => {
+    const keys = ['waiting', 'turnaround', 'response', 'completion'];
+    const res = { pid: proc.pid };
+    for (const k of keys) {
+      const values = runs.map((r) => r.processes[pIdx][k]);
+      const { bestIndices, bestValue } = findBest(values, false);
+      res[k] = { values, bestIndices, bestValue };
+    }
+    return res;
+  });
+
+  const verdict = allSchedulingVerdict(runs, metrics);
+  return { metrics, perProcess, verdict };
+}
+
+function allSchedulingVerdict(runs, metrics) {
+  const waitMetric = metrics.find((m) => m.key === 'avgWaiting');
+  const responseMetric = metrics.find((m) => m.key === 'avgResponse');
+  const switchesMetric = metrics.find((m) => m.key === 'contextSwitches');
+
+  const waitWinners = waitMetric.bestIndices.map((i) => describeSchedulingRun(runs[i]));
+  const respWinners = responseMetric.bestIndices.map((i) => describeSchedulingRun(runs[i]));
+  const switchWinners = switchesMetric.bestIndices.map((i) => describeSchedulingRun(runs[i]));
+
+  let text = '';
+  if (waitWinners.length === runs.length) {
+    text = `All algorithms give the same average waiting time (${f(waitMetric.bestValue)}).`;
+  } else if (waitWinners.length === 1) {
+    text = `${waitWinners[0]} has the lowest average waiting time (${f(waitMetric.bestValue)}).`;
+  } else {
+    text = `${waitWinners.join(' and ')} tie for lowest average waiting time (${f(waitMetric.bestValue)}).`;
+  }
+
+  if (respWinners.length === 1 && respWinners[0] !== waitWinners[0]) {
+    text += ` ${respWinners[0]} achieves the fastest average response (${f(responseMetric.bestValue)}).`;
+  }
+
+  if (switchWinners.length === 1 && switchWinners[0] !== waitWinners[0] && switchWinners[0] !== respWinners[0]) {
+    text += ` ${switchWinners[0]} minimizes context switches (${switchesMetric.bestValue}).`;
+  }
+
+  return text;
+}
+
+/** Compare multiple paging runs over the same reference string. */
+export function compareAllPagingRuns(runs) {
+  if (!Array.isArray(runs) || runs.length === 0) throw new Error('At least one run is required.');
+
+  const metricDefs = [
+    { key: 'faults', label: 'Page faults', getValue: (r) => r.faults, higherIsBetter: false },
+    { key: 'hits', label: 'Hits', getValue: (r) => r.hits, higherIsBetter: true },
+    { key: 'faultRate', label: 'Fault rate', getValue: (r) => r.faultRate, higherIsBetter: false },
+    { key: 'hitRate', label: 'Hit rate', getValue: (r) => r.hitRate, higherIsBetter: true },
+  ];
+
+  const EPS_LOCAL = 1e-9;
+  function findBest(values, higherIsBetter) {
+    if (!values.length) return { bestIndices: [], bestValue: null };
+    let best = values[0];
+    for (let i = 1; i < values.length; i++) {
+      const v = values[i];
+      if (higherIsBetter ? (v > best + EPS_LOCAL) : (v < best - EPS_LOCAL)) {
+        best = v;
+      }
+    }
+    const bestIndices = values
+      .map((v, i) => (Math.abs(v - best) < EPS_LOCAL ? i : -1))
+      .filter((i) => i !== -1);
+    return { bestIndices, bestValue: best };
+  }
+
+  const metrics = metricDefs.map((def) => {
+    const values = runs.map(def.getValue);
+    const { bestIndices, bestValue } = findBest(values, def.higherIsBetter);
+    return {
+      key: def.key,
+      label: def.label,
+      higherIsBetter: def.higherIsBetter,
+      values,
+      bestIndices,
+      bestValue,
+    };
+  });
+
+  const faultsMetric = metrics.find((m) => m.key === 'faults');
+  const winners = faultsMetric.bestIndices.map((i) => describePagingRun(runs[i]));
+  let verdict = '';
+  if (winners.length === runs.length) {
+    verdict = `All setups give the same number of page faults (${faultsMetric.bestValue}).`;
+  } else if (winners.length === 1) {
+    verdict = `${winners[0]} has the fewest page faults (${faultsMetric.bestValue}).`;
+  } else {
+    verdict = `${winners.join(' and ')} tie for fewest page faults (${faultsMetric.bestValue}).`;
+  }
+
+  // Which references any pair of runs handles differently
+  const differs = runs[0].steps.map((_, i) => runs.some((r) => r.steps[i].hit !== runs[0].steps[i].hit));
+
+  return { metrics, verdict, differs, differCount: differs.filter(Boolean).length };
+}

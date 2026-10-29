@@ -262,3 +262,60 @@ export function compareMemoryRuns(a, b) {
   }
   return { metrics, verdict };
 }
+
+/** Compare multiple memory placement strategies on the same requests. */
+export function compareAllMemoryRuns(runs) {
+  if (!Array.isArray(runs) || runs.length === 0) throw new Error('At least one run is required.');
+
+  const metricDefs = [
+    { key: 'refused', label: 'Requests refused', getValue: (r) => r.summary.refused, higherIsBetter: false },
+    { key: 'refusedExternal', label: 'Refused by fragmentation', getValue: (r) => r.summary.refusedExternal, higherIsBetter: false },
+    { key: 'internal', label: 'Internal fragmentation (KB)', getValue: (r) => r.summary.internal, higherIsBetter: false },
+    { key: 'external', label: 'External fragmentation (KB)', getValue: (r) => r.summary.external, higherIsBetter: false },
+    { key: 'largestHole', label: 'Largest free hole (KB)', getValue: (r) => r.summary.largestHole, higherIsBetter: true },
+    { key: 'utilization', label: 'Memory in use (%)', getValue: (r) => r.summary.utilization, higherIsBetter: true },
+  ];
+
+  const EPS = 1e-9;
+  function findBest(values, higherIsBetter) {
+    if (!values.length) return { bestIndices: [], bestValue: null };
+    let best = values[0];
+    for (let i = 1; i < values.length; i++) {
+      const v = values[i];
+      if (higherIsBetter ? (v > best + EPS) : (v < best - EPS)) {
+        best = v;
+      }
+    }
+    const bestIndices = values
+      .map((v, i) => (Math.abs(v - best) < EPS ? i : -1))
+      .filter((i) => i !== -1);
+    return { bestIndices, bestValue: best };
+  }
+
+  const metrics = metricDefs.map((def) => {
+    const values = runs.map(def.getValue);
+    const { bestIndices, bestValue } = findBest(values, def.higherIsBetter);
+    return {
+      key: def.key,
+      label: def.label,
+      higherIsBetter: def.higherIsBetter,
+      values,
+      bestIndices,
+      bestValue,
+    };
+  });
+
+  const refusedMetric = metrics.find((m) => m.key === 'refused');
+  const winners = refusedMetric.bestIndices.map((i) => runs[i].label);
+  let verdict = '';
+  if (refusedMetric.bestValue === 0) {
+    if (winners.length === runs.length) verdict = 'All strategies place every request.';
+    else verdict = `${winners.join(' and ')} placed every request without any refusals.`;
+  } else if (winners.length === 1) {
+    verdict = `${winners[0]} places more requests: refusing only ${refusedMetric.bestValue}.`;
+  } else {
+    verdict = `${winners.join(' and ')} tie with ${refusedMetric.bestValue} refused requests.`;
+  }
+
+  return { metrics, verdict };
+}

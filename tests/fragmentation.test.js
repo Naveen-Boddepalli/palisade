@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  simulateMemory, parseOperations, parsePartitions, formatOperations, compareMemoryRuns, STRATEGIES,
+  simulateMemory, parseOperations, parsePartitions, formatOperations, compareMemoryRuns, compareAllMemoryRuns, STRATEGIES,
 } from '../src/engine/fragmentation.js';
 import { randomMemoryWorkload } from '../src/engine/workload.js';
 
@@ -179,4 +179,14 @@ test('compareMemoryRuns: identical runs tie', () => {
   const cmp = compareMemoryRuns(fixed('best'), fixed('best'));
   assert.ok(cmp.metrics.every((m) => m.winner === -1));
   assert.equal(cmp.verdict, 'Both place every request.');
+});
+
+test('compareAllMemoryRuns: best fit places all while first and worst refuse', () => {
+  const runs = ['first', 'best', 'worst'].map((strat) => fixed(strat));
+  const cmp = compareAllMemoryRuns(runs);
+  const refused = cmp.metrics.find((m) => m.key === 'refused');
+  assert.deepEqual(refused.values, [1, 0, 1]);
+  assert.equal(refused.bestValue, 0);
+  assert.deepEqual(refused.bestIndices, [1]); // Best fit wins
+  assert.match(cmp.verdict, /Best fit/);
 });

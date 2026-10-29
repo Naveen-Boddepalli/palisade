@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { simulate } from '../src/engine/scheduling.js';
 import { simulatePaging } from '../src/engine/paging.js';
-import { better, compareSchedulingRuns, comparePagingRuns } from '../src/engine/compare.js';
+import { better, compareSchedulingRuns, comparePagingRuns, compareAllSchedulingRuns, compareAllPagingRuns } from '../src/engine/compare.js';
 
 const procs = (rows) => rows.map(([arrival, burst, priority = 0], i) => ({ pid: `P${i + 1}`, arrival, burst, priority }));
 const STAGGERED = procs([[0, 8], [1, 4], [2, 9], [3, 5]]);
@@ -117,4 +117,30 @@ test('a tie says so', () => {
   const cmp = comparePagingRuns(run, run);
   assert.equal(cmp.verdict, 'Both have 12 page faults.');
   assert.ok(cmp.metrics.every((m) => m.winner === -1));
+});
+
+test('compareAllSchedulingRuns: evaluates all 6 algorithms on staggered workload', () => {
+  const algos = ['fcfs', 'sjf', 'srtf', 'priority-np', 'priority-p', 'rr'];
+  const runs = algos.map((algo) => simulate(STAGGERED, algo, { quantum: 4 }));
+  const cmp = compareAllSchedulingRuns(runs);
+
+  assert.equal(cmp.metrics.length, 7);
+  const waitMetric = cmp.metrics.find((m) => m.key === 'avgWaiting');
+  // SRTF is index 2, avgWaiting 6.5
+  assert.equal(waitMetric.bestValue, 6.5);
+  assert.deepEqual(waitMetric.bestIndices, [2]);
+
+  assert.equal(cmp.perProcess.length, 4);
+  assert.match(cmp.verdict, /SRTF/);
+});
+
+test('compareAllPagingRuns: evaluates FIFO, LRU, Optimal on textbook string', () => {
+  const runs = ['fifo', 'lru', 'opt'].map((algo) => simulatePaging(TEXTBOOK, 3, algo));
+  const cmp = compareAllPagingRuns(runs);
+
+  const faults = cmp.metrics.find((m) => m.key === 'faults');
+  assert.deepEqual(faults.values, [15, 12, 9]);
+  assert.equal(faults.bestValue, 9);
+  assert.deepEqual(faults.bestIndices, [2]); // Optimal wins
+  assert.match(cmp.verdict, /Optimal/);
 });

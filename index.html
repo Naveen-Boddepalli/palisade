@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>OS Visualizer</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
   <header class="top">
@@ -58,6 +61,7 @@
         </div>
         <p id="algo-hint" class="hint"></p>
 
+        <label class="check"><input id="all-algos" type="checkbox"> Show result of all algorithms on this example</label>
         <label class="check"><input id="compare" type="checkbox"> Compare with a second algorithm</label>
         <div id="lane-b" hidden>
           <div class="field-row">
@@ -148,6 +152,7 @@
         </div>
         <p id="mem-hint" class="hint"></p>
 
+        <label class="check"><input id="mem-all-algos" type="checkbox"> Show result of all algorithms on this example</label>
         <label class="check"><input id="mem-compare" type="checkbox"> Compare with a second setup</label>
         <div id="mem-lane-b" hidden>
           <div class="field-row two">
@@ -236,6 +241,7 @@
         </div>
         <p id="frag-hint" class="hint"></p>
 
+        <label class="check"><input id="frag-all-algos" type="checkbox"> Show result of all strategies on this example</label>
         <label class="check"><input id="frag-compare" type="checkbox"> Compare with a second strategy</label>
         <div id="frag-lane-b" hidden>
           <div class="field-row">
@@ -294,6 +300,6 @@
   </div>
 
   <noscript><p class="wrap">This tool needs JavaScript.</p></noscript>
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/main.js?v=2"></script>
 </body>
 </html>
